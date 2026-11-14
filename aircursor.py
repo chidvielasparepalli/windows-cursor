@@ -1,8 +1,7 @@
-"""AirCursor for Windows — webcam head-tracking mouse controller."""
+﻿"""AirCursor for Windows â€” slow webcam head tracking with blink-to-click."""
 from __future__ import annotations
 
 import ctypes
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,16 +14,20 @@ from pynput.mouse import Button, Controller
 
 CAMERA_INDEX = 0
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
-SMOOTHING = 0.22
-SENSITIVITY = 2.4
-DEAD_ZONE = 0.012
-YAW_RANGE, PITCH_RANGE = 28.0, 22.0
-NOD_THRESHOLD = 13.0
-SHAKE_THRESHOLD = 25.0
-GESTURE_COOLDOWN = 0.9
-ENABLE_GESTURE_CLICKS = True
-MODEL_PATH = Path(__file__).parent / "models" / "face_landmarker.task"
 
+# Movement tuning: lower sensitivity + stronger smoothing = slower cursor.
+SMOOTHING = 0.10
+SENSITIVITY = 0.85
+DEAD_ZONE = 0.018
+YAW_RANGE, PITCH_RANGE = 32.0, 26.0
+
+# Blink detection (average Eye Aspect Ratio from both eyes).
+BLINK_EAR_THRESHOLD = 0.19
+MIN_BLINK_SECONDS = 0.055
+MAX_BLINK_SECONDS = 0.42
+BLINK_COOLDOWN = 0.75
+
+MODEL_PATH = Path(__file__).parent / "models" / "face_landmarker.task"
 user32 = ctypes.windll.user32
 SCREEN_W, SCREEN_H = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 mouse = Controller()
@@ -38,10 +41,9 @@ class State:
     center_pitch: float | None = None
     smooth_x: float = SCREEN_W / 2
     smooth_y: float = SCREEN_H / 2
-    last_gesture: float = 0.0
-    baseline_pitch: float | None = None
-    baseline_yaw: float | None = None
-    status: str = "PAUSED — press F8 to start"
+    blink_started: float | None = None
+    last_blink_click: float = 0.0
+    status: str = "PAUSED â€” press F8 to start"
 
 
 state = State()
@@ -49,9 +51,8 @@ state = State()
 
 def recenter() -> None:
     state.center_yaw = state.center_pitch = None
-    state.baseline_pitch = state.baseline_yaw = None
     state.smooth_x, state.smooth_y = SCREEN_W / 2, SCREEN_H / 2
-    state.status = "RE-CENTERING — look straight ahead"
+    state.status = "RE-CENTERING â€” look straight ahead"
 
 
 def on_key(key):
@@ -59,7 +60,7 @@ def on_key(key):
         state.enabled = not state.enabled
         if state.enabled:
             recenter()
-            state.status = "TRACKING — look straight ahead"
+            state.status = "TRACKING â€” look straight ahead"
         else:
             state.status = "PAUSED"
     elif key == keyboard.Key.f9:
@@ -69,17 +70,52 @@ def on_key(key):
         return False
 
 
+def eye_aspect_ratio(landmarks, ids) -> float:
+    points = np.array([(landmarks[i].x, landmarks[i].y) for i in ids], dtype=np.float64)
+    vertical_1 = np.linalg.norm(points[1] - points[5])
+    vertical_2 = np.linalg.norm(points[2] - points[4])
+    horizontal = np.linalg.norm(points[0] - points[3])
+    return float((vertical_1 + vertical_2) / (2.0 * horizontal + 1e-8))
+
+
+def detect_blink(face, now: float) -> bool:
+    # MediaPipe Face Mesh eye contours: [outer, upper-1, upper-2, inner, lower-2, lower-1].
+    left_ear = eye_aspect_ratio(face, [33, 160, 158, 133, 153, 144])
+    right_ear = eye_aspect_ratio(face, [362, 385, 387, 263, 373, 380])
+    ear = (left_ear + right_ear) / 2.0
+
+    if ear < BLINK_EAR_THRESHOLD:
+        if state.blink_started is None:
+            state.blink_started = now
+        return False
+
+    if state.blink_started is None:
+        return False
+
+    duration = now - state.blink_started
+    state.blink_started = None
+    if (MIN_BLINK_SECONDS <= duration <= MAX_BLINK_SECONDS
+            and now - state.last_blink_click >= BLINK_COOLDOWN):
+        mouse.click(Button.left, 1)
+        state.last_blink_click = now
+        return True
+    return False
+
+
 def move_cursor(yaw: float, pitch: float) -> None:
     if state.center_yaw is None or state.center_pitch is None:
         state.center_yaw, state.center_pitch = yaw, pitch
         state.smooth_x, state.smooth_y = SCREEN_W / 2, SCREEN_H / 2
         return
-    dx = (yaw - state.center_yaw) / YAW_RANGE
+
+    # Invert horizontal direction: turning the head left moves the pointer left.
+    dx = -(yaw - state.center_yaw) / YAW_RANGE
     dy = (pitch - state.center_pitch) / PITCH_RANGE
     if abs(dx) < DEAD_ZONE:
         dx = 0.0
     if abs(dy) < DEAD_ZONE:
         dy = 0.0
+
     target_x = np.clip(SCREEN_W / 2 + dx * SCREEN_W * 0.5 * SENSITIVITY, 0, SCREEN_W - 1)
     target_y = np.clip(SCREEN_H / 2 + dy * SCREEN_H * 0.5 * SENSITIVITY, 0, SCREEN_H - 1)
     state.smooth_x += (target_x - state.smooth_x) * SMOOTHING
@@ -88,10 +124,12 @@ def move_cursor(yaw: float, pitch: float) -> None:
 
 
 def main() -> int:
-    print("AirCursor for Windows — MediaPipe Tasks edition")
+    print("AirCursor for Windows â€” slow head tracking + blink click")
     print("F8: pause/resume | F9: recenter | ESC: quit")
     print(f"Screen: {SCREEN_W} x {SCREEN_H}")
-    print("Tracking starts PAUSED. Keep a physical mouse available.")
+    print("Starts PAUSED. Press F8 in the camera window or terminal.")
+    print("Blink once to left-click. Keep a physical mouse available.")
+
     if not MODEL_PATH.exists():
         print(f"ERROR: Face Landmarker model missing: {MODEL_PATH}")
         return 1
@@ -106,7 +144,6 @@ def main() -> int:
         listener.stop()
         return 1
 
-    # Six facial landmarks used for head-pose estimation.
     model_points = np.array([
         (0.0, 0.0, 0.0), (0.0, -330.0, -65.0),
         (-225.0, 170.0, -135.0), (225.0, 170.0, -135.0),
@@ -139,6 +176,7 @@ def main() -> int:
                 if not ok:
                     state.status = "CAMERA FRAME ERROR"
                     break
+
                 frame = cv2.flip(frame, 1)
                 height, width = frame.shape[:2]
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -149,6 +187,13 @@ def main() -> int:
 
                 if result.face_landmarks:
                     face = result.face_landmarks[0]
+                    now = time.monotonic()
+                    if state.enabled:
+                        if detect_blink(face, now):
+                            state.status = "BLINK CLICK"
+                        else:
+                            state.status = "TRACKING â€” blink to click"
+
                     image_points = np.array([
                         (face[i].x * width, face[i].y * height) for i in landmark_ids
                     ], dtype=np.float64)
@@ -167,40 +212,23 @@ def main() -> int:
                         if state.enabled:
                             if state.center_yaw is None or state.center_pitch is None:
                                 state.center_yaw, state.center_pitch = yaw, pitch
-                                state.baseline_yaw, state.baseline_pitch = yaw, pitch
-                                state.status = "TRACKING"
+                                state.smooth_x, state.smooth_y = SCREEN_W / 2, SCREEN_H / 2
                             else:
                                 move_cursor(yaw, pitch)
-                                now = time.monotonic()
-                                if ENABLE_GESTURE_CLICKS and now - state.last_gesture > GESTURE_COOLDOWN:
-                                    pitch_delta = pitch - (state.baseline_pitch if state.baseline_pitch is not None else pitch)
-                                    yaw_delta = yaw - (state.baseline_yaw if state.baseline_yaw is not None else yaw)
-                                    if pitch_delta > NOD_THRESHOLD:
-                                        mouse.click(Button.left, 1)
-                                        state.last_gesture = now
-                                        state.baseline_pitch, state.baseline_yaw = pitch, yaw
-                                        state.status = "NOD CLICK"
-                                    elif abs(yaw_delta) > SHAKE_THRESHOLD:
-                                        state.enabled = False
-                                        state.last_gesture = now
-                                        state.status = "SHAKE — PAUSED"
-                                if now - state.last_gesture > GESTURE_COOLDOWN:
-                                    bp = state.baseline_pitch if state.baseline_pitch is not None else pitch
-                                    by = state.baseline_yaw if state.baseline_yaw is not None else yaw
-                                    state.baseline_pitch = 0.98 * bp + 0.02 * pitch
-                                    state.baseline_yaw = 0.98 * by + 0.02 * yaw
 
                     x1, y1 = int(min(p.x for p in face) * width), int(min(p.y for p in face) * height)
                     x2, y2 = int(max(p.x for p in face) * width), int(max(p.y for p in face) * height)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (80, 220, 120), 1)
                 else:
-                    state.status = "NO FACE DETECTED" if state.enabled else "PAUSED — no face"
+                    state.blink_started = None
+                    state.status = "NO FACE DETECTED" if state.enabled else "PAUSED"
 
                 color = (40, 200, 80) if state.enabled else (40, 150, 230)
                 cv2.rectangle(frame, (0, height - 42), (width, height), (25, 25, 25), -1)
-                cv2.putText(frame, state.status, (12, height - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.62, color, 2)
-                cv2.putText(frame, "F8 Toggle | F9 Recenter | ESC/Q Quit", (12, height - 52),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.48, (230, 230, 230), 1)
+                cv2.putText(frame, state.status, (12, height - 14),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+                cv2.putText(frame, "F8 Toggle | F9 Recenter | ESC/Q Quit",
+                            (12, height - 52), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (230, 230, 230), 1)
                 cv2.imshow("AirCursor for Windows", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
@@ -217,3 +245,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
