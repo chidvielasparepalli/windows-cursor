@@ -1,153 +1,169 @@
 # AirCursor for Windows
 
-AirCursor is a webcam-based, hands-free mouse controller for Windows. It tracks your head movement to move the mouse pointer and uses a natural blink to perform a left-click.
+AirCursor is a webcam-based, hands-free mouse controller for Windows. Use your **head** or **hand gestures** to control the pointer without touching a mouse.
 
-It is inspired by the macOS AirCursor concept, but this Windows version uses your webcam, OpenCV, and MediaPipe Face Landmarker. **No AirPods, motion-sensing headset, or special hardware is required.**
+It uses OpenCV and MediaPipe Tasks locally. No AirPods, motion-sensing headset, or special hardware is required.
 
 ## Features
 
-- **Head tracking:** Move your head to move the mouse pointer.
-- **Direction mapping:** Turn your head left to move the pointer left; turn right to move it right.
-- **Slow, smooth movement:** Cursor movement is intentionally damped to reduce jitter.
-- **Blink-to-click:** A natural blink triggers one left-click.
-- **Live camera preview:** Shows face detection, head-pose values, and the current status.
-- **Keyboard controls:** Pause, resume, recenter, and quit at any time.
+### Head control
+- Move your head to move the pointer.
+- Horizontal direction is mapped naturally: head left = pointer left.
+- Slow, smoothed pointer movement.
+- Blink naturally to perform a left-click.
+
+### Hand air control
+- Move your hand in front of the webcam.
+- Point with your **index fingertip** to move the pointer.
+- Touch **thumb + index finger** to left-click.
+- Touch **thumb + little finger (pinky)** to right-click.
+- Pinch actions trigger once when the fingers come together; release before making another click.
+
+### Other features
+- Live webcam preview with face/hand tracking feedback.
+- Keyboard shortcuts to pause, switch modes, and recenter.
+- Camera processing is local; webcam frames are not uploaded by this app.
 
 ## Requirements
 
 - Windows 10 or Windows 11
 - Python 3.10–3.12 recommended
-- A built-in or USB webcam
-- Internet connection for the initial Python package installation
+- Built-in or USB webcam
+- Internet connection for first-time dependency installation
 
-The MediaPipe model file is included in the repository at `models/face_landmarker.task`; you do not need to download it separately.
+Both MediaPipe model files are included in the repository:
+- `models/face_landmarker.task`
+- `models/hand_landmarker.task`
+
+You do not need to download the models separately.
 
 ## Installation
 
 ### Option 1 — Quick setup (recommended)
 
-1. Download or clone this repository.
+1. Clone or download this repository.
 2. Open the project folder.
 3. Double-click **run.bat**.
 
-The first run creates a local Python virtual environment (`.venv`), installs the packages from `requirements.txt`, and starts AirCursor. Later runs reuse the installed environment.
+The first run creates a local virtual environment (`.venv`), installs the required Python packages, and starts AirCursor. Later runs reuse the installed environment.
 
-### Option 2 — Manual setup using PowerShell
+### Option 2 — Manual setup with PowerShell
 
-**1. Clone the repository**
+Clone the repository:
 
 ```powershell
 git clone https://github.com/chidvielasparepalli/windows-cursor.git
 cd windows-cursor
 ```
 
-If you have already cloned the project, open PowerShell in the existing `windows-cursor` folder instead.
+If you already cloned it, open PowerShell in the existing project folder.
 
-**2. Create a virtual environment**
+Create and activate a virtual environment:
 
 ```powershell
 python -m venv .venv
-```
-
-**3. Activate it**
-
-```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-If PowerShell blocks script activation, you can skip activation and use the virtual environment's Python executable directly.
-
-**4. Install dependencies**
+Install dependencies and start the app:
 
 ```powershell
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-**5. Start AirCursor**
-
-```powershell
 python aircursor.py
 ```
 
-If you skipped activation, run:
+If PowerShell blocks activation, run the virtual environment's Python directly:
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe aircursor.py
 ```
 
 ## First-time use
 
-1. Start AirCursor using `run.bat` or `python aircursor.py`.
-2. Allow camera access if Windows asks. If the camera does not open, check **Settings → Privacy & security → Camera** and enable camera access for desktop apps.
-3. Position your face clearly in the camera preview. Keep the camera near eye level and use steady lighting.
-4. AirCursor starts **paused**. Press **F8** to enable tracking.
-5. Look straight ahead briefly while the app recenters.
-6. Slowly turn your head left/right or up/down. The pointer should follow your head movement.
-7. Blink naturally once to perform a left-click.
+1. Start AirCursor with `run.bat` or `python aircursor.py`.
+2. Allow camera access if Windows asks. If needed, open **Settings → Privacy & security → Camera** and enable camera access for desktop apps.
+3. Position the webcam around eye level and use steady lighting.
+4. AirCursor starts **paused**. Press **F8** to enable control.
+5. Choose HEAD or HAND mode with **F6**.
+6. In HEAD mode, look straight ahead briefly after enabling or recentering.
+7. In HAND mode, hold one hand clearly in the camera view and point with your index finger.
 
 Keep a physical mouse available. Press F8 to pause immediately if the pointer behaves unexpectedly.
 
-## Keyboard controls
+## Controls
 
 | Key | Action |
 | --- | --- |
-| **F8** | Toggle tracking on/off. Starts paused. |
-| **F9** | Recenter. Look straight ahead after pressing. |
+| **F8** | Enable or pause pointer control. Starts paused. |
+| **F6** | Switch between HEAD and HAND control modes. |
+| **F9** | Recenter head control; look straight ahead after pressing. |
 | **ESC** | Quit AirCursor. |
 | **Q** | Quit when the camera preview window is focused. |
 
-## Settings and tuning
+## Gestures
 
-The main settings are near the top of `aircursor.py`:
+| Mode | Gesture | Action |
+| --- | --- | --- |
+| HEAD | Natural blink | Left-click |
+| HAND | Index fingertip movement | Move pointer |
+| HAND | Touch thumb and index fingertip | Left-click |
+| HAND | Touch thumb and little fingertip | Right-click |
+
+In HAND mode, the pinch is detected when the fingertips come close together. Release the pinch before repeating the click. The app applies a short cooldown to reduce accidental repeated clicks.
+
+## Tuning
+
+Open `aircursor.py` and adjust the constants near the top:
 
 | Setting | Purpose |
 | --- | --- |
-| `SMOOTHING` | Cursor response. Lower values make movement slower and smoother; higher values make it faster. |
-| `SENSITIVITY` | Overall cursor travel for a given head movement. Lower values reduce pointer travel. |
+| `SMOOTHING` | Head pointer smoothing. Lower is slower/smoother. |
+| `SENSITIVITY` | Head pointer travel. Lower reduces movement. |
 | `DEAD_ZONE` | Small head movements ignored to reduce jitter. |
-| `YAW_RANGE` | Horizontal head-turn range used for pointer movement. |
-| `PITCH_RANGE` | Vertical head-tilt range used for pointer movement. |
-| `BLINK_EAR_THRESHOLD` | Blink sensitivity. Increase slightly if blinks are not detected; decrease if normal eye movements cause clicks. |
-| `BLINK_COOLDOWN` | Minimum delay between blink clicks. |
+| `HAND_SMOOTHING` | Hand pointer smoothing. Lower is slower/smoother. |
+| `HAND_EDGE_MARGIN` | Active hand-tracking area near the camera frame edges. |
+| `PINCH_THRESHOLD` | Finger proximity required to register a pinch. Lower requires a tighter pinch. |
+| `BLINK_EAR_THRESHOLD` | Blink detection sensitivity in HEAD mode. |
 
-After changing settings, save the file and restart AirCursor.
+Save changes and restart AirCursor to apply them.
 
 ## Troubleshooting
 
 **Camera does not open**
-- Close other apps that may be using the webcam.
+- Close other applications that may be using the webcam.
 - Check Windows camera permissions for desktop apps.
-- If you have multiple cameras, change `CAMERA_INDEX = 0` near the top of `aircursor.py` to `1` and try again.
+- If you have multiple cameras, change `CAMERA_INDEX = 0` in `aircursor.py` to `1` and retry.
 
-**Face is not detected**
-- Improve room lighting and face the camera.
-- Move closer to the camera and keep your full face visible.
-- Avoid strong backlighting.
+**Face or hand is not detected**
+- Improve lighting and avoid strong backlighting.
+- Keep your face or the whole hand visible in the webcam view.
+- Move the hand closer to the camera if fingertips are hard to detect.
 
-**Cursor does not move**
-- Remember that tracking starts paused. Press F8.
-- Make sure your face is visible in the preview.
-- Press F9 while looking straight ahead to recenter.
+**Pointer does not move**
+- Press F8; the app starts paused.
+- Press F6 to select the intended control mode.
+- In HAND mode, show one hand clearly. In HEAD mode, keep your face visible.
+- Press F9 to recenter head tracking.
 
-**Cursor moves in the wrong direction**
-- The current horizontal mapping is configured so turning your head left moves the pointer left. If your camera or setup behaves differently, inspect the horizontal sign in `move_cursor()`.
+**Pointer is too fast, slow, or shaky**
+- Adjust `SMOOTHING`, `SENSITIVITY`, or `DEAD_ZONE` for HEAD mode.
+- Adjust `HAND_SMOOTHING` for HAND mode.
+- Keep the webcam stable.
 
-**Cursor is too fast, slow, or shaky**
-- Adjust `SENSITIVITY`, `SMOOTHING`, and `DEAD_ZONE` in the settings section.
-- Keep the camera stable and avoid changing your distance from it while tracking.
-
-**Blink does not click reliably**
-- Use a natural, brief blink while tracking is enabled.
-- Ensure both eyes are visible and the lighting is adequate.
-- Adjust `BLINK_EAR_THRESHOLD` gradually. A threshold that is too high can cause accidental clicks.
+**Pinch click does not register**
+- Make sure the thumb and requested fingertip are both visible.
+- Try a slightly tighter or clearer pinch.
+- Adjust `PINCH_THRESHOLD` gradually. A larger value makes the pinch easier to trigger but may cause accidental clicks.
 
 **Dependency installation fails**
 - Use a supported Python version (3.10–3.12 recommended).
-- Run `python --version` to check the installed version.
-- Recreate the virtual environment if it contains incompatible packages: delete the project's `.venv` folder and run `run.bat` again.
+- Check with `python --version`.
+- Delete the project's `.venv` folder and run `run.bat` again to rebuild the environment.
 
-## Project files
+## Project structure
 
 ```text
 windows-cursor/
@@ -155,13 +171,18 @@ windows-cursor/
 ├── requirements.txt
 ├── run.bat
 ├── models/
-│   └── face_landmarker.task
+│   ├── face_landmarker.task
+│   └── hand_landmarker.task
 └── README.md
 ```
 
-## Safety and privacy
+## Safety
 
-- Tracking starts paused; press F8 when you are ready.
-- Keep a physical mouse available so you can regain control immediately.
-- Blink detection can occasionally miss a blink or register an unintended click. Test carefully before using it for important actions.
-- Camera frames are processed locally by the application. This project does not include a feature to upload or store webcam footage.
+- Pointer control starts paused.
+- Keep a physical mouse available.
+- Test gestures carefully before using them for important actions. Camera angle, lighting, and hand position can affect detection.
+- This is an experimental accessibility-style controller, not a replacement for a conventional mouse in every situation.
+
+## License
+
+MIT
