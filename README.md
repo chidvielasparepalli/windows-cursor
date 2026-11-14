@@ -165,7 +165,3 @@ windows-cursor/
 - Keep a physical mouse available so you can regain control immediately.
 - Blink detection can occasionally miss a blink or register an unintended click. Test carefully before using it for important actions.
 - Camera frames are processed locally by the application. This project does not include a feature to upload or store webcam footage.
-
-## License
-
-MIT
