@@ -8,3 +8,4 @@ venv/
 dist/
 build/
 *.spec
+.aircursor_eye_calibration.npz
