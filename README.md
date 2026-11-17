@@ -1,4 +1,4 @@
-# AirCursor for Windows
+# AirCursor
 
 AirCursor is a webcam-based, hands-free mouse controller for Windows. It supports **HEAD**, **HAND**, and **EYE** control using local computer vision.
 
