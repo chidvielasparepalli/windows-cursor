@@ -4,6 +4,8 @@ AirCursor is a webcam-based, hands-free mouse controller for Windows. It support
 
 It uses OpenCV and MediaPipe Tasks locally. Camera frames are processed on your computer and are not uploaded by this app.
 
+> **Repository status:** The checked-in `aircursor.py` is a loader, not the application source. It requires `aircursor_runtime.pyc`, but that runtime file is currently absent from this repository. As a result, the application cannot launch from this checkout until the runtime is restored from a trusted release/source package. The launcher now reports this clearly instead of proceeding with an incomplete setup.
+
 ## Features
 
 ### Head control
@@ -53,7 +55,7 @@ You do not need to download the models separately.
 2. Open the project folder.
 3. Double-click `run.bat`.
 
-The first run creates `.venv`, installs dependencies, and starts AirCursor. Later runs reuse the environment.
+The launcher checks for the required runtime before creating a virtual environment. **At present, the runtime is missing, so launching will stop with an explanatory message.** Once `aircursor_runtime.pyc` is restored, the first run creates `.venv`, installs dependencies, and starts AirCursor. Later runs reuse the environment.
 
 ### Manual PowerShell setup
 ```powershell
@@ -66,11 +68,11 @@ python -m pip install -r requirements.txt
 python aircursor.py
 ```
 
-For an existing clone, open PowerShell in the project folder and run the commands from `python -m venv` onward. If activation is blocked, invoke `\.venv\Scripts\python.exe` directly.
+For an existing clone, open PowerShell in the project folder and run the commands from `python -m venv` onward. If activation is blocked, invoke `.venv\Scripts\python.exe` directly. These steps install dependencies but cannot replace the missing runtime.
 
 ## First-time use
 
-1. Start with `run.bat` or `python aircursor.py`.
+1. Start with `run.bat` or `python aircursor.py` (requires the runtime file noted above).
 2. Allow camera access in Windows if prompted.
 3. Position the webcam near eye level. Keep your face well lit and fully visible.
 4. AirCursor starts paused.
@@ -157,11 +159,14 @@ Restart AirCursor after changing constants.
 - Press `F8`; the app starts paused.
 - Press `F6` to select the intended mode.
 - In EYE mode, complete calibration first.
-- Keep a physical mouse available and press `F8` to pause immediately if needed.
+- Keep a physical mouse available and press `F8` to pause immediately.
 
 **Dependency installation fails**
 - Use a supported Python version (3.10–3.12 recommended).
 - Delete `.venv` and run `run.bat` again to rebuild the environment.
+
+**Runtime file missing**
+- The current repository checkout does not include `aircursor_runtime.pyc`. Obtain the matching runtime from a trusted release/source distribution before launching. The launcher detects this and exits before installing dependencies.
 
 ## Project structure
 
@@ -176,7 +181,7 @@ windows-cursor/
 └── README.md
 ```
 
-The eye calibration file is generated locally after first-time setup and is not committed.
+The runtime file `aircursor_runtime.pyc` is required by `aircursor.py` but is not currently tracked in the repository. The eye calibration file is generated locally after first-time setup and is not committed.
 
 ## Safety
 
@@ -189,14 +194,12 @@ The eye calibration file is generated locally after first-time setup and is not 
 
 MIT
 
-
 ## Eye-mode gesture notes
 
 - The pointer uses a 5-frame median, dead zone, adaptive smoothing, and a per-second movement limit to reduce shaking.
 - A left-eye wink clicks the left mouse button; a right-eye wink clicks the right mouse button. Ordinary two-eye blinks do not click.
 - Hold the tongue visibly inside the mouth area, then move it upward to scroll up or downward to scroll down.
 - Tongue recognition is a conservative colour-based visual estimate. The bundled MediaPipe face model does not expose a dedicated tongue landmark, so lighting and visibility affect reliability.
-
 
 ## Latest eye-mode calibration update
 
