@@ -190,9 +190,6 @@ The runtime file `aircursor_runtime.pyc` is required by `aircursor.py` but is no
 - Test cursor movement before using it for important actions.
 - This is an experimental webcam-based controller; it may not match the accuracy of dedicated eye-tracking hardware.
 
-## License
-
-MIT
 
 ## Eye-mode gesture notes
 
