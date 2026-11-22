@@ -191,7 +191,7 @@ The runtime file `aircursor_runtime.pyc` is required by `aircursor.py` but is no
 - This is an experimental webcam-based controller; it may not match the accuracy of dedicated eye-tracking hardware.
 
 
-
+## Eye-mode gesture notes
 
 - The pointer uses a 5-frame median, dead zone, adaptive smoothing, and a per-second movement limit to reduce shaking.
 - A left-eye wink clicks the left mouse button; a right-eye wink clicks the right mouse button. Ordinary two-eye blinks do not click.
